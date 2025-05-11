@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Simple Mobile Responsive Game</title>
+<style>
+  /* Base reset and body setup */
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  html, body {
+    height: 100%;
+    background: linear-gradient(135deg, #4a90e2, #9013fe);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+  }
+
+  /* Game container sized to max 350x600 */
+  #game-container {
+    position: relative;
+    width: 350px;
+    height: 600px;
+    background: #ffffffdd;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+  }
+
+  /* Header with title and score */
+  #header {
+    background: #6a1b9a;
+    color: white;
+    font-weight: 700;
+    font-size: 1.2rem;
+    text-align: center;
+    padding: 12px 10px;
+    letter-spacing: 1.5px;
+  }
+  #score-display {
+    margin-top: 4px;
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
+  /* Game area where shapes appear */
+  #game-area {
+    flex: 1;
+    position: relative;
+    background: #f3f0ff;
+  }
+
+  /* Circle shapes */
+  .circle {
+    position: absolute;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(106,27,154,.4);
+    transition: transform 0.15s ease-in-out;
+  }
+  .circle:active {
+    transform: scale(0.9);
+    box-shadow: 0 2px 5px rgba(106,27,154,0.7);
+  }
+
+  /* Controls bar */
+  #controls {
+    background: #6a1b9a;
+    padding: 10px;
+    display: flex;
+    justify-content: space-around;
+  }
+  button {
+    flex: 1;
+    margin: 0 6px;
+    background: #ab47bc;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 10px 0;
+    box-shadow: 0 6px 10px #8e24aa;
+    transition: background-color 0.3s ease;
+    user-select: none;
+  }
+  button:active {
+    background-color: #7b1fa2;
+  }
+
+  /* Responsive text size for smaller widths */
+  @media (max-width: 350px) {
+    #game-container {
+      width: 100vw;
+      height: 85vh;
+      border-radius: 0;
+      box-shadow: none;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="game-container" role="main" aria-label="Simple circle tap game">
+  <header id="header">
+    Tap the Circles!<br/>
+    <span id="score-display" aria-live="polite" aria-atomic="true">Score: 0</span>
+  </header>
+  <section id="game-area" tabindex="0" aria-describedby="instructions">
+    <p id="instructions" class="sr-only">Tap the circles that appear to score points. Each tap increases your score. Tap start to begin and stop to end the game.</p>
+  </section>
+  <nav id="controls" aria-label="Game Controls">
+    <button id="start-btn" type="button" aria-pressed="false">Start</button>
+    <button id="stop-btn" type="button" aria-pressed="true" disabled>Stop</button>
+    <button id="reset-btn" type="button">Reset</button>
+  </nav>
+</div>
+
+<script>
+(() => {
+  const gameArea = document.getElementById('game-area');
+  const scoreDisplay = document.getElementById('score-display');
+  const startBtn = document.getElementById('start-btn');
+  const stopBtn = document.getElementById('stop-btn');
+  const resetBtn = document.getElementById('reset-btn');
+
+  let score = 0;
+  let gameActive = false;
+  let circleTimeoutId = null;
+  let currentCircle = null;
+
+  // Circle size range
+  const minSize = 40;
+  const maxSize = 80;
+
+  // Generate random integer between min and max (inclusive)
+  function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  // Create and display a circle at random position within game area
+  function createCircle() {
+    if (!gameActive) return;
+    // Remove previous circle if exists
+    if (currentCircle) {
+      currentCircle.remove();
+      currentCircle = null;
+    }
+
+    const circle = document.createElement('div');
+    circle.classList.add('circle');
+
+    const size = randInt(minSize, maxSize);
+    circle.style.width = size + 'px';
+    circle.style.height = size + 'px';
+
+    // Calculate max positions to keep circle fully inside game area
+    const maxLeft = gameArea.clientWidth - size;
+    const maxTop = gameArea.clientHeight - size;
+    const left = randInt(0, maxLeft);
+    const top = randInt(0, maxTop);
+
+    circle.style.left = left + 'px';
+    circle.style.top = top + 'px';
+
+    // Random vivid color for the circle
+    circle.style.backgroundColor = `hsl(${Math.floor(Math.random() * 360)}, 80%, 65%)`;
+
+    circle.setAttribute('role', 'button');
+    circle.setAttribute('tabindex', '0');
+    circle.setAttribute('aria-label', 'Tap circle to score points');
+
+    // Event handlers for tap and keyboard enter/space
+    function onScore() {
+      if (!gameActive) return;
+      score++;
+      updateScore();
+      removeCircle();
+      scheduleNextCircle();
+    }
+    function keyHandler(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onScore();
+      }
+    }
+    circle.addEventListener('click', onScore);
+    circle.addEventListener('keydown', keyHandler);
+
+    gameArea.appendChild(circle);
+    currentCircle = circle;
+  }
+
+  // Remove current circle safely
+  function removeCircle() {
+    if (currentCircle) {
+      currentCircle.removeEventListener('click', onScore);
+      currentCircle.removeEventListener('keydown', keyHandler);
+      currentCircle.remove();
+      currentCircle = null;
+    }
+  }
+
+  // Schedule next circle appearance at random interval (600-1500ms)
+  function scheduleNextCircle() {
+    if (!gameActive) return;
+    const delay = randInt(600, 1500);
+    circleTimeoutId = setTimeout(() => {
+      createCircle();
+    }, delay);
+  }
+
+  function updateScore() {
+    scoreDisplay.textContent = `Score: ${score}`;
+  }
+
+  function startGame() {
+    if (gameActive) return;
+    gameActive = true;
+    score = 0;
+    updateScore();
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    stopBtn.setAttribute('aria-pressed', 'false');
+    startBtn.setAttribute('aria-pressed', 'true');
+    scheduleNextCircle();
+  }
+
+  function stopGame() {
+    if (!gameActive) return;
+    gameActive = false;
+    if (circleTimeoutId) {
+      clearTimeout(circleTimeoutId);
+      circleTimeoutId = null;
+    }
+    if (currentCircle) {
+      currentCircle.remove();
+      currentCircle = null;
+    }
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    stopBtn.setAttribute('aria-pressed', 'true');
+    startBtn.setAttribute('aria-pressed', 'false');
+  }
+
+  function resetGame() {
+    stopGame();
+    score = 0;
+    updateScore();
+  }
+
+  // Button event listeners
+  startBtn.addEventListener('click', startGame);
+  stopBtn.addEventListener('click', stopGame);
+  resetBtn.addEventListener('click', resetGame);
+
+  // Accessibility: focus game area for keyboard users
+  gameArea.addEventListener('keydown', (e) => {
+    if (!currentCircle) return;
+    if (e.key === 'Tab') {
+      // Focus circle when tabbing inside game area
+      e.preventDefault();
+      const firstCircle = gameArea.querySelector('.circle');
+      if (firstCircle) firstCircle.focus();
+    }
+  });
+
+  // Prevent double click selection on mobile
+  document.body.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+})();
+</script>
+</body>
+</html>
+
+```
